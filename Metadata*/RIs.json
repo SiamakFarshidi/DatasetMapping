@@ -1,0 +1,6 @@
+{
+  "ICOS": ["ICOS"],
+  "SeaDataNet": ["SeaDataNet","SDN"],
+  "DiSSCo": ["DiSSCo", "DigitalSpecimen"],
+  "AnaEE": ["AnaEE"]
+}
