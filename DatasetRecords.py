@@ -744,7 +744,6 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
         #if metadata_property=="language" and (result=="" or result==[]):
         #   result= LangaugePrediction(extractTextualContent(JSON))
 
-
         if(cnt==len(metadataStar_object)):
             extrachar="\n"
         else:
@@ -798,7 +797,7 @@ def datasetProcessing_SeaDataNet_CDI_XML(datasetURL):
 #getDatasetRecords__SeaDataNet_EDMED()
 #getDatasetRecords__SeaDataNet_CDI()
 #--------------------
-lstDataset= processDatasetRecords__SeaDataNet_CDI(True,1)
+lstDataset= processDatasetRecords__SeaDataNet_CDI(True,100)
 for datasetURL in lstDataset:
     datasetProcessing_SeaDataNet_CDI(datasetURL)
 

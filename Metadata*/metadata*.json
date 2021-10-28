@@ -3,7 +3,7 @@
     "Text",
     "A brief description of a set of distribution options.",
     "len(15)",
-    "Data set name",
+    "Discovery parameter",
     "comments"
   ],
   "identifier": [
@@ -25,6 +25,7 @@
     "Text/URL",
     "Keywords or tags used to describe this content. Multiple entries in a keywords list are typically delimited by commas.",
     "array(comma)",
+    "Parameter groups",
     "gmd:keyword",
     "gco:CharacterString",
     "keywords",
@@ -311,6 +312,7 @@
     "Text",
     "The name of the item.",
     "Rule",
+    "Data set name",
     "fileName",
     "gmd:fileIdentifier",
     "gco:CharacterString",
