@@ -3,6 +3,7 @@
     "Text",
     "A brief description of a set of distribution options.",
     "len(15)",
+    "Data set name",
     "comments"
   ],
   "identifier": [
@@ -49,6 +50,7 @@
     "Text/URL",
     "A human-readable summary of specific accessibility features or deficiencies, consistent with the other accessibility metadata but expressing subtleties such as short descriptions are present but long descriptions will be needed for non-visual users or short descriptions are present and no long descriptions are needed.",
     "len(10)",
+    "Access/ordering of data",
     "gmd:accessConstraints",
     "@codeList",
     "accessUrl"
@@ -57,6 +59,7 @@
     "Organization/Person",
     "identification of, and means of communicating with, person(s) and organisation(s) with responsibility for maintaining the resource",
     "len(5)",
+    "Point of contact",
     "gmd:CI_ResponsibleParty",
     "gco:CharacterString",
     "responsibleOrganization",
@@ -83,6 +86,7 @@
     "Organization/Person",
     "The publisher of the dataset.",
     "len(2)",
+    "Data originator",
     "distributor",
     "gmd:organisationName",
     "gco:CharacterString",
@@ -102,7 +106,8 @@
     "contentLocation",
     "gmd:EX_GeographicBoundingBox",
     "gco:Decimal",
-    "coverageGeo"
+    "coverageGeo",
+    "Sea regions"
   ],
   "license": [
     "Text/URL",
@@ -124,6 +129,7 @@
     "Text",
     "The nature or genre of the resource.",
     "len(5)",
+    "Discipline",
     "gmd:topicCategory",
     "gmd:MD_TopicCategoryCode",
     "dwc:class",
@@ -145,6 +151,7 @@
     "DateTime",
     "Most recent date on which the item was changed, updated or modified.",
     "len(4)",
+    "CDI-record last update",
     "dateModified",
     "dcterms:modified"
   ],
@@ -186,6 +193,7 @@
     "Text",
     "An abstract is a short description that summarizes a dataset.",
     "Rule",
+    "Abstract",
     "gmd:abstract",
     "gco:CharacterString"
   ],
@@ -193,6 +201,7 @@
     "Text",
     "A main category of the resource. A resource can have multiple themes.",
     "Rule",
+    "GEMET-INSPIRE themes",
     "gmd:thesaurusName",
     "theme",
     "label",
@@ -206,7 +215,8 @@
     "gco:Date",
     "labelingDate",
     "dwc:geodeticDatum",
-    "dwc:year"
+    "dwc:year",
+    "Start date"
   ],
   "creditText": [
     "Text",
@@ -247,7 +257,8 @@
     "gco:Decimal",
     "coverageGeo",
     "coverage",
-    "coordinates"
+    "coordinates",
+    "Sea regions"
   ],
   "url": [
     "URL",
@@ -312,6 +323,7 @@
     "Text/URL",
     "A technique or technology used in a Dataset (or DataDownload, DataCatalog), corresponding to the method used for measuring the corresponding variable(s) (described using variableMeasured).",
     "Rule",
+    "Instrument/gear type",
     "instrument",
     "label",
     "uri"
@@ -530,6 +542,7 @@
     "URL/Text",
     "constraints applied to assure the protection of privacy or intellectual property, and any special restrictions or limitations or warnings on using the resource or metadata",
     "Rule",
+    "Access restriction",
     "gmd:useConstraints",
     "@codeList"
   ],
@@ -555,6 +568,7 @@
     "Text",
     "type of resource and/or extent to which the lineage information applies",
     "Rule",
+    "Lineage",
     "gmd:lineage",
     "gco:CharacterString"
   ],
@@ -604,6 +618,7 @@
     "Text/URL",
     "information about the distributor of and options for obtaining the resource(s)",
     "Rule",
+    "Data custodian",
     "gmd:distributionInfo",
     "gco:CharacterString",
     "gmd:URL",
@@ -618,6 +633,10 @@
     "Text",
     "provides overall assessment of quality of a resource(s)",
     "Rule",
+    "Quality info",
+    "Name",
+    "Date",
+    "Comment",
     "gmd:dataQualityInfo",
     "gco:CharacterString"
   ],

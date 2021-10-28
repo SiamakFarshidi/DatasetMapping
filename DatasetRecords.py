@@ -26,7 +26,10 @@ from fuzzywuzzy import fuzz
 from SPARQLWrapper import SPARQLWrapper, JSON
 import urllib.request
 import uuid
-
+import json, xmljson
+from lxml.etree import fromstring, tostring
+import xml.etree.ElementTree as ET
+import itertools
 #----------------------------------------------------------------------------------------
 #nltk.download('wordnet')
 #nltk.download('stopwords')
@@ -40,7 +43,7 @@ spacy_nlp  = spacy.load('en_core_web_md')
 #----------------------------------------------------------------------------------------
 MetaDataRecordPath="./Metadata records/"
 ICOS__MetadataRecordsFileName="ICOS-metadata-records.json"
-SeaDataNet__MetadataRecordsFileName= "SeaDataNet-metadata-records.json"
+SeaDataNet__MetadataRecordsFileName= "CDI-SeaDataNet-metadata-records.xml"
 metadataStar_root="./Metadata*/metadata*.json"
 RI_root="./Metadata*/RIs.json"
 indexFiles_root="./index files/"
@@ -52,13 +55,21 @@ acceptedSimilarityThreshold=0.75
 #----------------------------------------------------------------------------------------
 
 #-------------------SeaDataNet
-def getDatasetRecords__SeaDataNet():
+def getDatasetRecords__SeaDataNet_EDMED():
 
     with urllib.request.urlopen('https://edmed.seadatanet.org/sparql/sparql?query=select+%3FEDMEDRecord+%3FTitle+where+%7B%3FEDMEDRecord+a+%3Chttp%3A%2F%2Fwww.w3.org%2Fns%2Fdcat%23Dataset%3E+%3B+%3Chttp%3A%2F%2Fpurl.org%2Fdc%2Fterms%2Ftitle%3E+%3FTitle+.%7D+&output=json&stylesheet=') as f:
         data = f.read().decode('utf-8')
     json_data = json.loads(data)
-    indexFile= open(MetaDataRecordPath+SeaDataNet__MetadataRecordsFileName,"w+")
+    indexFile= open(MetaDataRecordPath+SeaDataNet__MetadataRecordsFileName+"_EDMED","w+")
     indexFile.write(json.dumps(json_data))
+    indexFile.close()
+    print("SeaDataNet data collection is done!")
+#-------------------
+def getDatasetRecords__SeaDataNet_CDI():
+    with urllib.request.urlopen('https://cdi.seadatanet.org/report/aggregation') as f:
+        data = f.read().decode('utf-8')
+    indexFile= open(MetaDataRecordPath+SeaDataNet__MetadataRecordsFileName,"w+")
+    indexFile.write(data)
     indexFile.close()
     print("SeaDataNet data collection is done!")
 #-------------------ICOS
@@ -79,7 +90,6 @@ def processDatasetRecords__ICOS(rnd,genRnd,startingPoint):
 
     cnt=1
     random_selection= random.sample(range(startingPoint, len(dataset_json["results"]["bindings"])), genRnd)
-    print(random_selection)
     c=0
 
     lstDatasetCollection=[]
@@ -87,7 +97,6 @@ def processDatasetRecords__ICOS(rnd,genRnd,startingPoint):
     for record in dataset_json["results"]["bindings"]:
         if cnt in random_selection or not(rnd):
             c=c+1
-            print(str(c)+"  ----------------------")
             filename=record["fileName"]["value"]
             landingPage=record["dobj"]["value"]
             timeEnd=record["timeEnd"]["value"]
@@ -95,14 +104,7 @@ def processDatasetRecords__ICOS(rnd,genRnd,startingPoint):
             submTime=record["submTime"]["value"]
             size =record["size"]["value"]
             spec=record["spec"]["value"]
-            print(filename)
-            print(landingPage)
-            print(timeEnd)
-            print(timeStart)
-            print(submTime)
-            print(size)
             #downloadableLink= "https://data.icos-cp.eu/objects/"+os.path.basename(urlparse(landingPage).path)
-            print(spec)
 
             lstDatasetCollection.append(landingPage)
         cnt=cnt+1
@@ -114,29 +116,43 @@ def processDatasetRecords__ICOS(rnd,genRnd,startingPoint):
 
 import random
 
-def processDatasetRecords__SeaDataNet(rnd,genRnd):
+def processDatasetRecords__SeaDataNet_EDMED(rnd,genRnd):
     indexFile= open(MetaDataRecordPath+SeaDataNet__MetadataRecordsFileName,"r")
     dataset_json = json.loads(indexFile.read())
 
     cnt=1
     random_selection= random.sample(range(1, len(dataset_json["results"]["bindings"])), genRnd)
-    print(random_selection)
     c=0
     lstDatasetCollection=[]
 
     for record in dataset_json["results"]["bindings"]:
         if cnt in random_selection or not(rnd):
             c=c+1
-            print(str(c)+"  ----------------------")
             landingPage=record["EDMEDRecord"]["value"]
             title=record["Title"]["value"]
-            print(landingPage)
-            print(title)
             lstDatasetCollection.append(landingPage)
         cnt=cnt+1
     return lstDatasetCollection
 #----------------------------------------------------------------------------------------
+def processDatasetRecords__SeaDataNet_CDI(rnd,genRnd):
+    tree = ET.parse(MetaDataRecordPath+SeaDataNet__MetadataRecordsFileName)
+    indexFile = tree.getroot()
+    cnt=1
+    random_selection= random.sample(range(1, len(indexFile)), genRnd)
+    c=0
+    lstDatasetCollection=[]
+    for record in indexFile:
+        if cnt in random_selection or not(rnd):
+            c=c+1
+            url=record.text
+            pos=url.rfind("/xml")
+            if(pos and pos+4==len(url)):
+                url=url.replace("/xml","/json")
+            lstDatasetCollection.append(url)
+        cnt=cnt+1
+    return lstDatasetCollection
 
+#----------------------------------------------------------------------------------------
 def getRI(dataset_JSON):
     RI_content = open(RI_root,"r")
     RI_json = json.loads(RI_content.read())
@@ -188,8 +204,12 @@ def clean(doc):
 #----------------------------------------------------------------------------------------
 def topicMining(dataset_json):
     lsttopic=[]
+    Jsontext=""
     if(dataset_json!=""):
-        Jsontext=extractTextualContent(dataset_json)
+        Jsontext=getContextualText (dataset_json)
+
+        if not len(Jsontext):
+            Jsontext=extractTextualContent(dataset_json)
         doc_clean = [clean(doc).split() for doc in Jsontext]
         dictionary = corpora.Dictionary(doc_clean)
         doc_term_matrix = [dictionary.doc2bow(doc) for doc in doc_clean]
@@ -210,7 +230,6 @@ def listToString(s):
 def getSimilarEssentialVariables(essentialVariables, topics):
     lstEssentialVariables=[]
     lsttopics= [*getSynonyms(topics), *topics]
-    #print (lsttopics)
     for variable in essentialVariables:
         for topic in lsttopics:
             w1=spacy_nlp(topic.lower())
@@ -257,7 +276,7 @@ def is_nested_list(l):
 #----------------------------------------------------------------------------------------
 def flatten_list(t):
     if(is_nested_list(t)):
-        return [item for sublist in t for item in sublist if not type(sublist)==str]
+        return [str(item) for sublist in t for item in sublist if not type(sublist)==str]
     return t
 #----------------------------------------------------------------------------------------
 def refineResults(TextArray,datatype,proprtyName):
@@ -344,7 +363,6 @@ def refineResults(TextArray,datatype,proprtyName):
             if ("language" in datatype):
                 if doc.ents:
                     for ent in doc.ents:
-                        print(ent.label_)
                         if(len(ent.text)>0) and ent.label_=="LANGUAGE" or ent.label_=="GPE":
                             refinedResults.append(ent.text) if ent.text not in refinedResults else refinedResults
             #..................................................................................
@@ -463,10 +481,7 @@ def datasetProcessing_ICOS(datasetURL):
                     if not len(topics):
                         topics=topicMining(JSON)
                     essentialVariables=getDomainEssentialVariables(domains[0])
-                    #print(essentialVariables)
                     result=getSimilarEssentialVariables(essentialVariables,topics)
-                    print(result)
-                    print(topics)
                 elif metadata_property=="url":
                     result=datasetURL
                 else:
@@ -496,9 +511,6 @@ def datasetProcessing_ICOS(datasetURL):
     indexFile.write("}")
     indexFile.close()
     logfile.close()
-
-
-
 #----------------------------------------------------------------------------------------
 def cleanhtml(raw_html):
     CLEANR = re.compile('<.*?>')
@@ -513,15 +525,12 @@ def getValueHTML_SeaDataNet(searchTerm, datasetContents):
             lstCoveredFeaturesSeaDataNet.append(searchTerm)
             return cleanhtml(datasetContent)[len(searchTerm):]
 #----------------------------------------------------------------------------------------
-
-#----------------------------------------------------------------------------------------
-def datasetProcessing_SeaDataNet(datasetURL):
+def datasetProcessing_SeaDataNet_EDMED(datasetURL):
     metadataStar_content = open(metadataStar_root,"r")
     metadataStar_object = json.loads(metadataStar_content.read())
     unique_filename = str(uuid.uuid4())
-    indexfname = os.path.join(indexFiles_root,"_SeaDataNet_"+unique_filename)
+    indexfname = os.path.join(indexFiles_root,"_SeaDataNet_EDMED_"+unique_filename)
     indexFile= open(indexfname+".json","w+")
-
     logfile = os.path.join(indexFiles_root,"logfile.csv")
     CSVvalue=""
     if not os.path.exists(logfile):
@@ -635,19 +644,176 @@ def datasetProcessing_SeaDataNet(datasetURL):
     indexFile.close()
     logfile.close()
 #----------------------------------------------------------------------------------------
+def NestedDictValues(d):
+    if type(d)==dict:
+        for v in d.values():
+            if isinstance(v, dict):
+                yield from NestedDictValues(v)
+            else:
+                yield v
+#----------------------------------------------------------------------------------------
+def MergeList(contextualText):
+    lstText=[]
+    for entity in contextualText:
+        if type(entity)==list:
+            for item in entity:
+                lstText.append(item.strip())
+        else:
+            lstText.append(entity.strip())
+    return lstText
+#----------------------------------------------------------------------------------------
+def getContextualText(JSON):
+    contextualText=""
+    contextualText=deep_search(["Data set name", "Discipline","Parameter groups","Discovery parameter","GEMET-INSPIRE themes"],JSON)
+    if not len(contextualText):
+        contextualText=deep_search(["Abstract"],JSON)
+    contextualText=list(NestedDictValues(contextualText))
+    return MergeList(contextualText)
+#----------------------------------------------------------------------------------------
+def datasetProcessing_SeaDataNet_CDI(datasetURL):
+    metadataStar_content = open(metadataStar_root,"r")
+    metadataStar_object = json.loads(metadataStar_content.read())
+    with urllib.request.urlopen(datasetURL) as f:
+        data = f.read().decode('utf-8')
+    JSON=json.loads(data)
+
+    unique_filename = str(uuid.uuid4())
+    indexfname = os.path.join(indexFiles_root,"SeaDataNet_CDI_"+unique_filename)
+    indexFile= open(indexfname+".json","w+")
+
+    logfile = os.path.join(indexFiles_root,"logfile.csv")
+    CSVvalue=""
+    if not os.path.exists(logfile):
+        logfile= open(logfile,"a+")
+        for metadata_property in metadataStar_object:
+            CSVvalue=CSVvalue+metadata_property+","
+        logfile.write(CSVvalue)
+    else:
+        logfile= open(logfile,"a+")
+
+    CSVvalue="\n"
+
+    indexFile.write("{\n")
+
+    RI=""
+    domains=""
+    topics=[]
+    cnt=0
+    for metadata_property in metadataStar_object:
+        cnt=cnt+1
+
+        if metadata_property=="ResearchInfrastructure":
+            result= getRI(JSON)
+        elif metadata_property=="theme":
+            if not len(RI):
+                #RI= getRI(JSON)
+                RI="SeaDataNet"
+            if not len(domains):
+                domains = getDomain(RI)
+            if not len(topics):
+                topics=topicMining(JSON)
+            result=getTopicsByDomainVocabulareis(topics,domains[0])
+        elif metadata_property=="language":
+            result="English"
+        elif metadata_property=="potentialTopics":
+            if not len(topics):
+                topics=topicMining(JSON)
+            result=topics
+        elif metadata_property=="EssentialVariables":
+            if not len(RI):
+                RI= getRI(JSON)
+            if not len(domains):
+                domains = getDomain(RI)
+            if not len(topics):
+                topics=topicMining(JSON)
+            essentialVariables=getDomainEssentialVariables(domains[0])
+            result=getSimilarEssentialVariables(essentialVariables,topics)
+        elif metadata_property=="url":
+            result=datasetURL
+        else:
+            result=deep_search([metadata_property],JSON)
+            if not len(result):
+                searchFields=[]
+                for i in range (3, len(metadataStar_object[metadata_property])):
+                    result=deep_search([metadataStar_object[metadata_property][i]],JSON)
+                    if len(result): searchFields.append(result)
+                result=searchFields
+        propertyDatatype=metadataStar_object[metadata_property][0]
+        result=refineResults(result,propertyDatatype,metadata_property)
+
+        #if metadata_property=="language" and (result=="" or result==[]):
+        #   result= LangaugePrediction(extractTextualContent(JSON))
+
+
+        if(cnt==len(metadataStar_object)):
+            extrachar="\n"
+        else:
+            extrachar=",\n"
+
+        flattenValue=(str(MergeList(flatten_list(result)))
+                          .replace("></a","").replace(",","-")
+                          .replace("[","").replace("]","").replace("{","")
+                          .replace("'","").replace("\"","").replace("}","")
+                          .replace("\"\"","").replace(">\\","")
+                          .replace("' ","'").replace(" '","'"))
+        flattenValue= str([x.strip() for x in flattenValue.split('-')])
+
+        indexFile.write("\""+str(metadata_property)+"\" :"+flattenValue.replace("'","\"")+extrachar)
+        CSVvalue=CSVvalue+flattenValue.replace(",","-").replace("[","").replace("]","").replace("'","").replace("\"","").replace("\"\"","")+","
+    logfile.write(CSVvalue)
+    indexFile.write("}")
+    indexFile.close()
+    logfile.close()
+#----------------------------------------------------------------------------------------
+class Decoder(json.JSONDecoder):
+    def decode(self, s):
+        result = super().decode(s)  # result = super(Decoder, self).decode(s) for Python 2.x
+        return self._decode(result)
+
+    def _decode(self, o):
+        if isinstance(o, int):
+            try:
+                return str(o)
+            except ValueError:
+                return o
+        elif isinstance(o, dict):
+            return {k: self._decode(v) for k, v in o.items()}
+        elif isinstance(o, list):
+            return [self._decode(v) for v in o]
+        else:
+            return o
+#----------------------------------------------------------------------------------------
+def datasetProcessing_SeaDataNet_CDI_XML(datasetURL):
+    metadataStar_content = open(metadataStar_root,"r")
+    metadataStar_object = json.loads(metadataStar_content.read())
+
+    with urllib.request.urlopen(datasetURL) as f:
+        data = f.read().decode('utf-8')
+    data=data.replace("gmd:","").replace("gco:","").replace("sdn:","").replace("gml:","").replace("gts:","").replace("xlink:","").replace("\"{","")
+    xml = fromstring(data.encode())
+    JSON=json.loads(json.dumps(xmljson.badgerfish.data(xml)),cls=Decoder)
+#----------------------------------------------------------------------------------------
 #--------------------
 #getDataSetRecords__ICOS()
-lstDataset= (processDatasetRecords__ICOS(True,2000,250000))
+#getDatasetRecords__SeaDataNet_EDMED()
+#getDatasetRecords__SeaDataNet_CDI()
+#--------------------
+lstDataset= processDatasetRecords__SeaDataNet_CDI(True,1)
 for datasetURL in lstDataset:
-    datasetProcessing_ICOS(datasetURL)
+    datasetProcessing_SeaDataNet_CDI(datasetURL)
+
+
+#--------------------
+
+#lstDataset= (processDatasetRecords__ICOS(True,2000,250000))
+#for datasetURL in lstDataset:
+#    datasetProcessing_ICOS(datasetURL)
 
 #datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/Msxml8TlWbHvmQmDD6EdVgPc")
 
 #datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/7c3iQ3A8SAeupVvMi8wFPWEN")
 
 
-#--------------------
-#getDatasetRecords__SeaDataNet()
 #lstDataset= (processDatasetRecords__SeaDataNet(True,1000))
 #for datasetURL in lstDataset:
 #   datasetProcessing_SeaDataNet(datasetURL)
