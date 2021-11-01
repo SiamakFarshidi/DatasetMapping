@@ -29,7 +29,11 @@ import uuid
 import json, xmljson
 from lxml.etree import fromstring, tostring
 import xml.etree.ElementTree as ET
-import itertools
+import glob
+import csv
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from webdriver_manager.chrome import ChromeDriverManager
 #----------------------------------------------------------------------------------------
 #nltk.download('wordnet')
 #nltk.download('stopwords')
@@ -53,7 +57,16 @@ domainVocbularies_root="./Metadata*/Vocabularies.json"
 #----------------------------------------------------------------------------------------
 acceptedSimilarityThreshold=0.75
 #----------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------
 
+#-------------------Lifewatch
+def getDatasetRecords__Lifewatch():
+    driver = webdriver.Chrome(ChromeDriverManager().install())
+    driver.get("https://metadatacatalogue.lifewatch.eu/srv/eng/catalog.search#/search?facet.q=type%2Fdataset&resultType=details&sortBy=relevance&from=301&to=400&fast=index&_content_type=json")
+#    elem = driver.find_element_by_name("q")
+    print (print(driver.title))
+    print("Lifewatch data collection is done!")
+    driver.close()
 #-------------------SeaDataNet
 def getDatasetRecords__SeaDataNet_EDMED():
 
@@ -782,10 +795,84 @@ class Decoder(json.JSONDecoder):
         else:
             return o
 #----------------------------------------------------------------------------------------
+def invertedIndexing(datasetTitle):
+    indexfnames = os.path.join(indexFiles_root,datasetTitle)
+    lstIndexFileNames=glob.glob(indexfnames+"*")
+    Hashtablefnames = os.path.join(indexFiles_root,"Hashtable_"+datasetTitle+".csv")
+
+    lstKeywords=[]
+    lstEssentialVariables=[]
+    lstPotentialTopics=[]
+
+    hashtable={}
+    for indexFile in lstIndexFileNames:
+        indexFile_content = open(indexFile,"r")
+        indexFile_object = json.loads(indexFile_content.read())
+        lstKeywords.append(indexFile_object["keywords"])
+        lstEssentialVariables.append(indexFile_object["EssentialVariables"])
+        lstPotentialTopics.append(indexFile_object["potentialTopics"])
+
+    lstKeywords=MergeList(lstKeywords)
+    lstEssentialVariables=MergeList(lstEssentialVariables)
+    lstPotentialTopics=MergeList(lstPotentialTopics)
+
+    for keyword in lstKeywords:
+        if len(keyword)<200:
+            if keyword.lower() not in hashtable.keys():
+                hashtable[keyword.lower()]=[]
+
+    for keyword in lstEssentialVariables:
+        if len(keyword)<200:
+            if keyword.lower() not in hashtable.keys():
+                hashtable[keyword.lower()]=[]
+
+    for keyword in lstPotentialTopics:
+        if len(keyword)<200:
+            if keyword.lower() not in hashtable.keys():
+                hashtable[keyword.lower()]=[]
+
+
+    for indexFile in lstIndexFileNames:
+        lstKeywords.clear()
+        lstEssentialVariables.clear()
+        lstPotentialTopics.clear()
+
+        indexFile_content = open(indexFile,"r")
+        indexFile_object = json.loads(indexFile_content.read())
+        lstKeywords.append(indexFile_object["keywords"])
+        lstEssentialVariables.append(indexFile_object["EssentialVariables"])
+        lstPotentialTopics.append(indexFile_object["potentialTopics"])
+        url=indexFile_object["url"][0]
+
+        lstKeywords=MergeList(lstKeywords)
+        lstEssentialVariables=MergeList(lstEssentialVariables)
+        lstPotentialTopics=MergeList(lstPotentialTopics)
+
+        for keyword in lstKeywords:
+            if keyword.lower() in hashtable.keys():
+                if url not in hashtable[keyword.lower()]:
+                    hashtable[keyword.lower()].append(url)
+
+        for keyword in lstEssentialVariables:
+            if keyword.lower() in hashtable.keys():
+                if url not in hashtable[keyword.lower()]:
+                    hashtable[keyword.lower()].append(url)
+
+        for keyword in lstPotentialTopics:
+            if keyword.lower() in hashtable.keys():
+                if url not in hashtable[keyword.lower()]:
+                    hashtable[keyword.lower()].append(url)
+
+
+    with open(Hashtablefnames, 'w') as f:
+        for key in hashtable.keys():
+            value= str(hashtable[key]).replace("'","").replace("[","").replace("]","")
+            f.write("%s, %s\n" % (key, value))
+    print("Inverted indexing is done!")
+#----------------------------------------------------------------------------------------
 def datasetProcessing_SeaDataNet_CDI_XML(datasetURL):
     metadataStar_content = open(metadataStar_root,"r")
     metadataStar_object = json.loads(metadataStar_content.read())
-
     with urllib.request.urlopen(datasetURL) as f:
         data = f.read().decode('utf-8')
     data=data.replace("gmd:","").replace("gco:","").replace("sdn:","").replace("gml:","").replace("gts:","").replace("xlink:","").replace("\"{","")
@@ -797,29 +884,22 @@ def datasetProcessing_SeaDataNet_CDI_XML(datasetURL):
 #getDatasetRecords__SeaDataNet_EDMED()
 #getDatasetRecords__SeaDataNet_CDI()
 #--------------------
-lstDataset= processDatasetRecords__SeaDataNet_CDI(True,100)
-for datasetURL in lstDataset:
-    datasetProcessing_SeaDataNet_CDI(datasetURL)
-
-
+#lstDataset= processDatasetRecords__SeaDataNet_CDI(True,100)
+#for datasetURL in lstDataset:
+#    datasetProcessing_SeaDataNet_CDI(datasetURL)
 #--------------------
-
 #lstDataset= (processDatasetRecords__ICOS(True,2000,250000))
 #for datasetURL in lstDataset:
 #    datasetProcessing_ICOS(datasetURL)
-
-#datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/Msxml8TlWbHvmQmDD6EdVgPc")
-
-#datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/7c3iQ3A8SAeupVvMi8wFPWEN")
-
-
+#--------------------
 #lstDataset= (processDatasetRecords__SeaDataNet(True,1000))
 #for datasetURL in lstDataset:
 #   datasetProcessing_SeaDataNet(datasetURL)
-
+#--------------------
+#datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/Msxml8TlWbHvmQmDD6EdVgPc")
+#datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/7c3iQ3A8SAeupVvMi8wFPWEN")
 #datasetProcessing_SeaDataNet("https://edmed.seadatanet.org/report/249/")
 #--------------------
+#invertedIndexing("SeaDataNet_CDI")
 
-
-
-
+getDatasetRecords__Lifewatch()
