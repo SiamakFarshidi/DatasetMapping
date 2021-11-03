@@ -60,6 +60,7 @@
     "Organization/Person",
     "identification of, and means of communicating with, person(s) and organisation(s) with responsibility for maintaining the resource",
     "len(5)",
+    "contact",
     "Point of contact",
     "gmd:CI_ResponsibleParty",
     "gco:CharacterString",
