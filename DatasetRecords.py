@@ -58,10 +58,11 @@ essentialVariabels_root="./Metadata*/essential_variables.json"
 domainVocbularies_root="./Metadata*/Vocabularies.json"
 #----------------------------------------------------------------------------------------
 acceptedSimilarityThreshold=0.75
+CommonSubsetThreshold=0.0
 contextualInfo=""
 #----------------------------------------------------------------------------------------
 #-------------------Lifewatch
-def getDatasetRecords__Lifewatch():
+def getDatasetRecords__LifeWatch():
     driver = webdriver.Chrome(ChromeDriverManager().install())
     driver.get("https://metadatacatalogue.lifewatch.eu/srv/eng/catalog.search#/search?facet.q=type%2Fdataset&resultType=details&sortBy=relevance&from=301&to=400&fast=index&_content_type=json")
 #    elem = driver.find_element_by_name("q")
@@ -97,7 +98,7 @@ def getDatasetRecords__ICOS():
     indexFile.close()
     print("ICOS data collection is done!")
 #----------------------------------------------------------------------------------------
-def processDatasetRecords__Lifewatch(rnd,genRnd,startingPoint):
+def getOnlineDatasetRecords__LifeWatch(rnd,genRnd,startingPoint):
     indexFile = os.path.join(MetaDataRecordPath+Lifewatch__MetadataRecordsFileName)
     cnt=1
     c=0
@@ -116,9 +117,10 @@ def processDatasetRecords__Lifewatch(rnd,genRnd,startingPoint):
             url=baseline
             lstDatasetCollection.append(url+datasetID+xml)
             cnt=cnt+1
+    saveSelectedURLs(lstDatasetCollection, "LifeWatch")
     return lstDatasetCollection
 #----------------------------------------------------------------------------------------
-def processDatasetRecords__ICOS(rnd,genRnd,startingPoint):
+def getOnlineDatasetRecords__ICOS(rnd,genRnd,startingPoint):
     indexFile= open(MetaDataRecordPath+ICOS__MetadataRecordsFileName,"r")
     dataset_json = json.loads(indexFile.read())
 
@@ -142,6 +144,7 @@ def processDatasetRecords__ICOS(rnd,genRnd,startingPoint):
 
             lstDatasetCollection.append(landingPage)
         cnt=cnt+1
+    saveSelectedURLs(lstDatasetCollection, "ICOS")
     return lstDatasetCollection
 
 #----------------------------------------------------------------------------------------
@@ -150,10 +153,9 @@ def processDatasetRecords__ICOS(rnd,genRnd,startingPoint):
 
 import random
 
-def processDatasetRecords__SeaDataNet_EDMED(rnd,genRnd,startingPoint):
+def getOnlineDatasetRecords__SeaDataNet_EDMED(rnd,genRnd,startingPoint):
     indexFile= open(MetaDataRecordPath+SeaDataNet_EDMED__MetadataRecordsFileName,"r")
     dataset_json = json.loads(indexFile.read())
-
     cnt=1
     random_selection= random.sample(range(startingPoint, len(dataset_json["results"]["bindings"])), genRnd)
     c=0
@@ -166,9 +168,10 @@ def processDatasetRecords__SeaDataNet_EDMED(rnd,genRnd,startingPoint):
             title=record["Title"]["value"]
             lstDatasetCollection.append(landingPage)
         cnt=cnt+1
+    saveSelectedURLs(lstDatasetCollection, "SeaDataNet_EDMED")
     return lstDatasetCollection
 #----------------------------------------------------------------------------------------
-def processDatasetRecords__SeaDataNet_CDI(rnd,genRnd,startingPoint):
+def getOnlineDatasetRecords__SeaDataNet_CDI(rnd,genRnd,startingPoint):
     tree = ET.parse(MetaDataRecordPath+SeaDataNet_CDI__MetadataRecordsFileName)
     indexFile = tree.getroot()
     cnt=1
@@ -184,6 +187,7 @@ def processDatasetRecords__SeaDataNet_CDI(rnd,genRnd,startingPoint):
                 url=url.replace("/xml","/json")
             lstDatasetCollection.append(url)
         cnt=cnt+1
+    saveSelectedURLs(lstDatasetCollection, "SeaDataNet_CDI")
     return lstDatasetCollection
 
 #----------------------------------------------------------------------------------------
@@ -406,6 +410,9 @@ def refineResults(TextArray,datatype,proprtyName):
             if proprtyName.lower() not in str(text).lower() and ("text" in datatype or "definedterm" in datatype):
                 refinedResults.append(text) if text not in refinedResults else refinedResults
             #..................................................................................
+
+
+
     return refinedResults
 #----------------------------------------------------------------------------------------
 foundResults=[]
@@ -472,6 +479,7 @@ def datasetProcessing_ICOS(datasetURL):
         logfile= open(logfile,"a+")
         for metadata_property in metadataStar_object:
             CSVvalue=CSVvalue+metadata_property+","
+        CSVvalue=CSVvalue+"Precision (EV), Recall (EV), Accuracy (EV), F (EV), Precision (To), Recall (To), Accuracy (To), F (To),"
         logfile.write(CSVvalue)
     else:
         logfile= open(logfile,"a+")
@@ -491,7 +499,9 @@ def datasetProcessing_ICOS(datasetURL):
             RI=""
             domains=""
             topics=[]
+            originalValues=[]
             cnt=0
+            lstKeywords=[]
             for metadata_property in metadataStar_object:
                 cnt=cnt+1
 
@@ -510,6 +520,7 @@ def datasetProcessing_ICOS(datasetURL):
                     if not len(topics):
                         topics=topicMining(JSON,"ICOS")
                     result=topics
+                    result= pruneExtractedContextualInformation(result, originalValues)
                 elif metadata_property=="EssentialVariables":
                     if not len(RI):
                         RI= getRI(JSON)
@@ -519,6 +530,7 @@ def datasetProcessing_ICOS(datasetURL):
                         topics=topicMining(JSON, "ICOS")
                     essentialVariables=getDomainEssentialVariables(domains[0])
                     result=getSimilarEssentialVariables(essentialVariables,topics)
+                    result= pruneExtractedContextualInformation(result, originalValues)
                 elif metadata_property=="url":
                     result=datasetURL
                 else:
@@ -541,12 +553,31 @@ def datasetProcessing_ICOS(datasetURL):
                     extrachar=",\n"
 
                 flattenValue=str(flatten_list(result))
-                indexFile.write("\""+str(metadata_property)+"\" :"+flattenValue.replace("'","\"")+extrachar)
+                if flattenValue=="[None]":
+                    flattenValue="[]"
+
+                if (metadata_property=="description" or metadata_property=="keywords" or metadata_property=="abstract"):
+                    txtVal=flattenValue.replace("[","").replace("]","").replace("'","").replace("\"","").replace("\"\"","").replace("None","")
+                    if txtVal!="":
+                        originalValues.append(txtVal)
+
+                indexFile.write("\""+str(metadata_property)+"\" :"+
+                                flattenValue.replace("']","\"]").replace("['","[\"").replace("',","\",").replace(", '",", \"").replace("\"\"","\"")
+                                +extrachar)
                 CSVvalue=CSVvalue+flattenValue.replace(",","-").replace("[","").replace("]","").replace("'","").replace("\"","")+","
-    logfile.write(CSVvalue)
+
+                if metadata_property=="keywords":
+                    lstKeywords=flattenValue
+
     indexFile.write("}")
     indexFile.close()
+    Precision, Recall, Accuracy, F=  metadataRecord_similarity_evaluation(indexfname+".json",'EssentialVariables',['description','keywords','abstract'],essentialVariables)
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","
+    Precision, Recall, Accuracy, F = metadataRecord_similarity_evaluation(indexfname+".json",'potentialTopics',['description','keywords','abstract'],lstKeywords.split(","))
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","
+    logfile.write(CSVvalue)
     logfile.close()
+
 #----------------------------------------------------------------------------------------
 def cleanhtml(raw_html):
     CLEANR = re.compile('<.*?>')
@@ -565,14 +596,16 @@ def datasetProcessing_SeaDataNet_EDMED(datasetURL):
     metadataStar_content = open(metadataStar_root,"r")
     metadataStar_object = json.loads(metadataStar_content.read())
     unique_filename = str(uuid.uuid4())
-    indexfname = os.path.join(indexFiles_root,"_SeaDataNet_EDMED_"+unique_filename)
+    indexfname = os.path.join(indexFiles_root,"SeaDataNet_EDMED_"+unique_filename)
     indexFile= open(indexfname+".json","w+")
     logfile = os.path.join(indexFiles_root,"logfile.csv")
     CSVvalue=""
+    originalValues=[]
     if not os.path.exists(logfile):
         logfile= open(logfile,"a+")
         for metadata_property in metadataStar_object:
             CSVvalue=CSVvalue+metadata_property+","
+        CSVvalue=CSVvalue+"Precision (EV), Recall (EV), Accuracy (EV), F (EV), Precision (To), Recall (To), Accuracy (To), F (To),"
         logfile.write(CSVvalue)
     else:
         logfile= open(logfile,"a+")
@@ -582,7 +615,7 @@ def datasetProcessing_SeaDataNet_EDMED(datasetURL):
     lstCoveredFeaturesSeaDataNet.clear()
     mapping={}
     cnt=0
-
+    lstKeywords=[]
     mapping["url"]=str(datasetURL)
     mapping["ResearchInfrastructure"]="SeaDataNet"
     RI="SeaDataNet"
@@ -614,6 +647,8 @@ def datasetProcessing_SeaDataNet_EDMED(datasetURL):
     value=(getValueHTML_SeaDataNet("Parameters", datasetContents))
     mapping["keywords"]=str(value)
     EDMED_JSON["keywords"]=value
+    if type(value)==str or type(value)==list:
+        lstKeywords=str(value)
 
     value=(getValueHTML_SeaDataNet("Instruments", datasetContents))
     mapping["measurementTechnique"]=str(value)
@@ -680,6 +715,15 @@ def datasetProcessing_SeaDataNet_EDMED(datasetURL):
             value=mapping[metadata_property]
             if type( mapping[metadata_property])!=list:
                 value=[value]
+
+            if (metadata_property=="description" or metadata_property=="keywords" or metadata_property=="abstract"):
+                txtVal=str(value).replace("[","").replace("]","").replace("'","").replace("\"","").replace("\"\"","").replace("None","")
+                if txtVal!="":
+                    originalValues.append(txtVal)
+
+            elif metadata_property=="potentialTopics" or metadata_property=="EssentialVariables":
+                value= pruneExtractedContextualInformation(value, originalValues)
+
             indexFile.write("\""+str(metadata_property)+"\" :"+str(value).replace("'","\"")+extrachar)
             CSVvalue=CSVvalue+str(value).replace(",","-").replace("[","").replace("]","").replace("'","").replace("\"","")+","
         else:
@@ -689,10 +733,15 @@ def datasetProcessing_SeaDataNet_EDMED(datasetURL):
 #    value=(getValueHTML_SeaDataNet("Availability", datasetContents))
 #    value=(getValueHTML_SeaDataNet("Ongoing", datasetContents))
 #    value=(getValueHTML_SeaDataNet("Global identifier", datasetContents))
-    logfile.write(CSVvalue)
     indexFile.write("}")
     indexFile.close()
+    Precision, Recall, Accuracy, F=  metadataRecord_similarity_evaluation(indexfname+".json",'EssentialVariables',['description','keywords','abstract'],essentialVariables)
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","
+    Precision, Recall, Accuracy, F = metadataRecord_similarity_evaluation(indexfname+".json",'potentialTopics',['description','keywords','abstract'],str(lstKeywords).split(","))
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","
+    logfile.write(CSVvalue)
     logfile.close()
+
 #----------------------------------------------------------------------------------------
 def NestedDictValues(d):
     if type(d)==dict:
@@ -761,6 +810,7 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
         logfile= open(logfile,"a+")
         for metadata_property in metadataStar_object:
             CSVvalue=CSVvalue+metadata_property+","
+        CSVvalue=CSVvalue+"Precision (EV), Recall (EV), Accuracy (EV), F (EV), Precision (To), Recall (To), Accuracy (To), F (To),"
         logfile.write(CSVvalue)
     else:
         logfile= open(logfile,"a+")
@@ -768,11 +818,12 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
     CSVvalue="\n"
 
     indexFile.write("{\n")
-
+    originalValues=[]
     RI=""
     domains=""
     topics=[]
     cnt=0
+    lstKeywords=[]
     for metadata_property in metadataStar_object:
         cnt=cnt+1
 
@@ -793,6 +844,7 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
             if not len(topics):
                 topics=topicMining(JSON,"SeaDataNet_CDI")
             result=topics
+            result= pruneExtractedContextualInformation(result, originalValues)
         elif metadata_property=="EssentialVariables":
             if not len(RI):
                 RI= getRI(JSON)
@@ -802,6 +854,7 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
                 topics=topicMining(JSON,"SeaDataNet_CDI")
             essentialVariables=getDomainEssentialVariables(domains[0])
             result=getSimilarEssentialVariables(essentialVariables,topics)
+            result= pruneExtractedContextualInformation(result, originalValues)
         elif metadata_property=="url":
             result=datasetURL
         else:
@@ -831,12 +884,26 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
                           .replace("' ","'").replace(" '","'"))
         flattenValue= str([x.strip() for x in flattenValue.split('-')])
 
+        if (metadata_property=="description" or metadata_property=="keywords" or metadata_property=="abstract"):
+            txtVal=flattenValue.replace("[","").replace("]","").replace("'","").replace("\"","").replace("\"\"","").replace("None","")
+            if txtVal!="":
+                originalValues.append(txtVal)
+
         indexFile.write("\""+str(metadata_property)+"\" :"+flattenValue.replace("'","\"")+extrachar)
         CSVvalue=CSVvalue+flattenValue.replace(",","-").replace("[","").replace("]","").replace("'","").replace("\"","").replace("\"\"","")+","
-    logfile.write(CSVvalue)
+
+        if metadata_property=="keywords":
+            lstKeywords=flattenValue
+
     indexFile.write("}")
     indexFile.close()
+    Precision, Recall, Accuracy, F=  metadataRecord_similarity_evaluation(indexfname+".json",'EssentialVariables',['description','keywords','abstract'],essentialVariables)
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","
+    Precision, Recall, Accuracy, F = metadataRecord_similarity_evaluation(indexfname+".json",'potentialTopics',['description','keywords','abstract'],lstKeywords.split(","))
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","
+    logfile.write(CSVvalue)
     logfile.close()
+
 #----------------------------------------------------------------------------------------
 class Decoder(json.JSONDecoder):
     def decode(self, s):
@@ -929,6 +996,8 @@ def invertedIndexing(datasetTitle):
             value= str(hashtable[key]).replace("'","").replace("[","").replace("]","")
             f.write("%s, %s\n" % (key, value))
     print("Inverted indexing is done!")
+    f.close()
+
 #----------------------------------------------------------------------------------------
 def datasetProcessing_SeaDataNet_CDI_XML(datasetURL):
     metadataStar_content = open(metadataStar_root,"r")
@@ -953,6 +1022,7 @@ def datasetProcessing_LifeWatch(datasetURL):
         logfile= open(logfile,"a+")
         for metadata_property in metadataStar_object:
             CSVvalue=CSVvalue+metadata_property+","
+        CSVvalue=CSVvalue+"Precision (EV), Recall (EV), Accuracy (EV), F (EV), Precision (To), Recall (To), Accuracy (To), F (To),"
         logfile.write(CSVvalue)
     else:
         logfile= open(logfile,"a+")
@@ -960,12 +1030,12 @@ def datasetProcessing_LifeWatch(datasetURL):
     CSVvalue="\n"
 
     indexFile.write("{\n")
-
+    originalValues=[]
     RI=""
     domains=""
     topics=[]
     cnt=0
-
+    lstKeywords=[]
     datasetDic={}
     with urllib.request.urlopen(datasetURL) as f:
         data = f.read().decode('utf-8')
@@ -1010,6 +1080,7 @@ def datasetProcessing_LifeWatch(datasetURL):
             if not len(topics):
                 topics=topicMining(JSON, "LifeWatch")
             result=topics
+            result= pruneExtractedContextualInformation(result, originalValues)
         elif metadata_property=="EssentialVariables":
             if not len(RI):
                 RI= getRI(JSON)
@@ -1019,6 +1090,7 @@ def datasetProcessing_LifeWatch(datasetURL):
                 topics=topicMining(JSON, "LifeWatch")
             essentialVariables=getDomainEssentialVariables(domains[0])
             result=getSimilarEssentialVariables(essentialVariables,topics)
+            result= pruneExtractedContextualInformation(result, originalValues)
         elif metadata_property=="url":
             result=datasetURL
         else:
@@ -1031,7 +1103,6 @@ def datasetProcessing_LifeWatch(datasetURL):
                 result=searchFields
         propertyDatatype=metadataStar_object[metadata_property][0]
         result=refineResults(result,propertyDatatype,metadata_property)
-
         #if metadata_property=="language" and (result=="" or result==[]):
         #   result= LangaugePrediction(extractTextualContent(JSON))
 
@@ -1048,75 +1119,175 @@ def datasetProcessing_LifeWatch(datasetURL):
                       .replace("' ","'").replace(" '","'"))
         flattenValue= str([x.strip() for x in flattenValue.split('-')])
 
+        if (metadata_property=="description" or metadata_property=="keywords" or metadata_property=="abstract"):
+            txtVal=flattenValue.replace("[","").replace("]","").replace("'","").replace("\"","").replace("\"\"","").replace("None","")
+            if txtVal!="":
+                originalValues.append(txtVal)
+
         indexFile.write("\""+str(metadata_property)+"\" :"+flattenValue.replace("'","\"")+extrachar)
         CSVvalue=CSVvalue+flattenValue.replace(",","-").replace("[","").replace("]","").replace("'","").replace("\"","").replace("\"\"","")+","
-    logfile.write(CSVvalue)
+
+        if metadata_property=="keywords":
+            lstKeywords=flattenValue
+
     indexFile.write("}")
     indexFile.close()
+
+    Precision, Recall, Accuracy, F=  metadataRecord_similarity_evaluation(indexfname+".json",'EssentialVariables',['description','keywords','abstract'],essentialVariables)
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","   
+    Precision, Recall, Accuracy, F = metadataRecord_similarity_evaluation(indexfname+".json",'potentialTopics',['description','keywords','abstract'], (lstKeywords.split(",")))
+    CSVvalue=CSVvalue+ str(Precision)+","+ str(Recall)+"," +str(Accuracy)+","+ str(F) +","
+    logfile.write(CSVvalue)
     logfile.close()
 #----------------------------------------------------------------------------------------
 def get_jaccard_sim(str1, str2):
     a = set(str1.split())
     b = set(str2.split())
     c = a.intersection(b)
-    similarityScore= float(len(c)) / (len(a) + len(b) - len(c))
-
-    print(str1)
-    print(str2)
-    print(similarityScore)
-    print("--------------------------------")
-
-    return similarityScore
+    if ((len(a) + len(b) - len(c))>0) :
+        sim = float(len(c)) / (len(a) + len(b) - len(c))
+    else :
+        sim=0
+    return sim
 #----------------------------------------------------------------------------------------
-def metadataRecord_similarity_evaluation(filename, drivedFields, originalFields):
-    simScore=0
+def getFalseNegative(drivedFields, originalFields, SetOfValues):
+    lstPotentialValues=[]
+    for orgFields in originalFields:
+        for potentialvalue in SetOfValues:
+            simScore=get_jaccard_sim(potentialvalue.lower(),orgFields.lower())
+            if(simScore>CommonSubsetThreshold and potentialvalue not in drivedFields and potentialvalue not in lstPotentialValues):
+                lstPotentialValues.append(potentialvalue)
+    return lstPotentialValues
+#----------------------------------------------------------------------------------------
+def pruneExtractedContextualInformation(drivedValues, originalValues):
+    #########################################
+    #Turn it off:
+    return drivedValues
+    ########################################
+    lstAcceptedValues=[]
+    if len(drivedValues) and len(originalValues):
+        for subDrivedField in drivedValues:
+            for originalField in originalValues:
+                simScore=get_jaccard_sim(subDrivedField.lower(),originalField.lower())
+                if(simScore> CommonSubsetThreshold and subDrivedField not in lstAcceptedValues):
+                    lstAcceptedValues.append(subDrivedField)
+    else:
+        lstAcceptedValues=drivedValues
+
+    return lstAcceptedValues
+#----------------------------------------------------------------------------------------
+def metadataRecord_similarity_evaluation(filename, drivedField, originalFields, SetOfPotentialValues):
     dataset_content = open(filename,"r")
     dataset_object = json.loads(dataset_content.read())
-    for drivedfield in drivedFields:
-        for originalField in originalFields:
-            simScore=simScore+get_jaccard_sim(drivedfield,originalField )
-    return simScore
+
+    similarityDic={}
+    ScoreSim={}
+
+    lstOriginalValues=[]
+    lstdrivedValues=[]
+
+    TruePositive=[]
+    FalsePositive=[]
+    FalseNegative=[]
+    TrueNegative=[]
+
+    for originalField in originalFields:
+        for subDrivedField in dataset_object[drivedField]:
+            for subOriginalField in dataset_object[originalField]:
+                simScore=get_jaccard_sim(subDrivedField.lower(),subOriginalField.lower())
+
+                if subOriginalField not in lstOriginalValues:
+                    lstOriginalValues.append(subOriginalField)
+
+                if subDrivedField not in lstdrivedValues:
+                    lstdrivedValues.append(subDrivedField)
+
+                if simScore>CommonSubsetThreshold and subDrivedField not in TruePositive:
+                    TruePositive.append(subDrivedField)
+
+    for drivedVal in dataset_object[drivedField]:
+        if drivedVal not in TruePositive:
+            FalsePositive.append(drivedVal)
+
+    FalseNegative=getFalseNegative(lstdrivedValues, lstOriginalValues, SetOfPotentialValues)
+
+    for PotentialVal in SetOfPotentialValues:
+        if PotentialVal not in dataset_object[drivedField] and PotentialVal not in FalseNegative:
+            TrueNegative.append(PotentialVal)
+
+    TP=len(TruePositive)
+    FP=len(FalsePositive)
+    TN=len(TrueNegative)
+    FN=len(FalseNegative)
+
+    Precision=0
+    Recall=0
+    Accuracy=0
+    F=0
+    
+    if (TP+FP)>0:
+        Precision= TP / (TP+FP)
+    if (TP+FN)>0:
+        Recall= TP/(TP+FN)
+    if(TP+TN+FP+FN)>0:
+        Accuracy= (TP+ TN)/ (TP+TN+FP+FN)
+    if(Precision + Recall)>0:
+        F= 2 * (Precision*Recall)/ (Precision + Recall)
+
+    return Precision, Recall, Accuracy, F
+#----------------------------------------------------------------------------------------
+def getCurrentListOfDatasetRecords(datasetTitle):
+    RndIndexFiles = os.path.join(indexFiles_root,datasetTitle+".csv")
+    lstIndexFileNames=[]
+    with open(RndIndexFiles, newline='') as f:
+        reader = csv.reader(f)
+        for url in reader:
+            lstIndexFileNames.append(url[0])
+    f.close()
+    return lstIndexFileNames
+#----------------------------------------------------------------------------------------
+def saveSelectedURLs(lstDataset, datasetTitle):
+    RndIndexFiles = os.path.join(indexFiles_root,datasetTitle+".csv")
+    with open(RndIndexFiles, 'w') as f:
+        for url in lstDataset:
+            f.write("%s\n" % url)
+    f.close()
 #--------------------
-metadataRecord_similarity_evaluation("./index files/_SeaDataNet_EDMED_5264aafa-40d8-4208-a617-c3ddb7d79816.json",
-                                     ['EssentialVariables','potentialTopics'],
-                                     ['description','keywords','abstract'])
-
-metadataRecord_similarity_evaluation("./index files/LifeWatch_c37190e3-374e-4ebb-a98e-350aa65f782b.json",
-                                     ['EssentialVariables','potentialTopics'],
-                                     ['description','keywords','abstract'])
-
-metadataRecord_similarity_evaluation("./index files/_SeaDataNet_EDMED_117f0eed-70d5-4491-bde7-b8f7e67c70d9.json",
-                                     ['EssentialVariables','potentialTopics'],
-                                     ['description','keywords','abstract'])
-
-
-
-#--------------------
+#----------------------------------------------------------------------------------------
 #getDatasetRecords__SeaDataNet_EDMED()
 #getDatasetRecords__SeaDataNet_CDI()
-#getDatasetRecords__Lifewatch()
+#getDatasetRecords__LifeWatch()
 #getDataSetRecords__ICOS()
 #--------------------
-#lstDataset= processDatasetRecords__SeaDataNet_EDMED(True,100,1)
-#for datasetURL in lstDataset:
-#   datasetProcessing_SeaDataNet_EDMED(datasetURL)
+#lstDataset= getOnlineDatasetRecords__SeaDataNet_EDMED(True,100,1)
+#lstDataset= getOnlineDatasetRecords__SeaDataNet_CDI(True,100,1)
+#lstDataset= getOnlineDatasetRecords__ICOS(True,100,1)
+#lstDataset= getOnlineDatasetRecords__LifeWatch(True,100,1)
 #--------------------
-#lstDataset= processDatasetRecords__SeaDataNet_CDI(True,100,1)
-#for datasetURL in lstDataset:
-#    datasetProcessing_SeaDataNet_CDI(datasetURL)
+lstDataset= getCurrentListOfDatasetRecords("SeaDataNet_CDI")
+for datasetURL in lstDataset:
+    datasetProcessing_SeaDataNet_CDI(datasetURL)
 #--------------------
-#lstDataset= processDatasetRecords__ICOS(True,100,1)
-#for datasetURL in lstDataset:
-#    datasetProcessing_ICOS(datasetURL)
+lstDataset= getCurrentListOfDatasetRecords("ICOS")
+for datasetURL in lstDataset:
+    datasetProcessing_ICOS(datasetURL)
 #--------------------
-#lstDataset= processDatasetRecords__Lifewatch(True,100,1)
-#for datasetURL in lstDataset:
-#   datasetProcessing_LifeWatch(datasetURL)
+lstDataset= getCurrentListOfDatasetRecords("LifeWatch")
+for datasetURL in lstDataset:
+   datasetProcessing_LifeWatch(datasetURL)
 #--------------------
+lstDataset= getCurrentListOfDatasetRecords("SeaDataNet_EDMED")
+for datasetURL in lstDataset:
+   datasetProcessing_SeaDataNet_EDMED(datasetURL)
+#--------------------
+#datasetProcessing_SeaDataNet_CDI("https://cdi.seadatanet.org/report/aggregation/120/2688/120/4/ds12/json")
+#datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/mpjm3qpCpK1EzMPIR9nDE5BO")
 #datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/Msxml8TlWbHvmQmDD6EdVgPc")
 #datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/7c3iQ3A8SAeupVvMi8wFPWEN")
-#datasetProcessing_SeaDataNet("https://edmed.seadatanet.org/report/249/")
+#datasetProcessing_SeaDataNet_EDMED("https://edmed.seadatanet.org/report/249/")
 #datasetProcessing_LifeWatch("https://metadatacatalogue.lifewatch.eu/srv/api/records/oai:marineinfo.org:id:dataset:4040/formatters/xml?approved=true")
+
 #--------------------
 #invertedIndexing("SeaDataNet_CDI")
 #invertedIndexing("LifeWatch_")
+#--------------------
