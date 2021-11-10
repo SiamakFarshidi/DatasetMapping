@@ -45,6 +45,7 @@ lemma = WordNetLemmatizer()
 Lda = gensim.models.ldamodel.LdaModel
 spacy_nlp  = spacy.load('en_core_web_md')
 #----------------------------------------------------------------------------------------
+currentRun="Run 15/"
 MetaDataRecordPath="./Metadata records/"
 ICOS__MetadataRecordsFileName="ICOS-metadata-records.json"
 SeaDataNet_CDI__MetadataRecordsFileName= "SeaDataNet-CDI-metadata-records.xml"
@@ -52,7 +53,7 @@ SeaDataNet_EDMED__MetadataRecordsFileName= "SeaDataNet-EDMED-metadata-records.js
 Lifewatch__MetadataRecordsFileName= "LifeWatch.txt"
 metadataStar_root="./Metadata*/metadata*.json"
 RI_root="./Metadata*/RIs.json"
-indexFiles_root="./index files/"
+indexFiles_root="./index files/"+currentRun
 domain_root="./Metadata*/domain.json"
 essentialVariabels_root="./Metadata*/essential_variables.json"
 domainVocbularies_root="./Metadata*/Vocabularies.json"
@@ -241,6 +242,14 @@ def clean(doc):
     return normalized
 #----------------------------------------------------------------------------------------
 def topicMining(dataset_json,RI):
+    #########################################
+    # Turn it off:
+#    if RI=="SeaDataNet_EDMED": Jsontext=getContextualText_SeaDataNet_EDMED(dataset_json)
+#    if RI=="SeaDataNet_CDI": Jsontext= getContextualText_SeaDataNet_CDI (dataset_json)
+#    if RI=="LifeWatch": Jsontext= getContextualText_LifeWatch (dataset_json)
+#    if RI=="ICOS": Jsontext= getContextualText_ICOS (dataset_json)
+#    return Jsontext
+    ########################################
     lsttopic=[]
     Jsontext=""
     if(dataset_json!=""):
@@ -320,7 +329,42 @@ def flatten_list(t):
         return [str(item) for sublist in t for item in sublist if not type(sublist)==str]
     return t
 #----------------------------------------------------------------------------------------
-def refineResults(TextArray,datatype,proprtyName):
+#########################################
+# Turn it off: refineResults_ -> refineResults
+
+#def refineResults(TextArray,datatype,proprtyName):
+#    datatype=datatype.lower()
+#    refinedResults=[]
+#    if len(TextArray):
+#        if type(TextArray)==str:
+#            TextArray=[TextArray]
+#        if type(TextArray)==dict:
+#           TextArray=list(NestedDictValues(TextArray))
+
+#        if type(TextArray)==list:
+#            TextArray=flatten_list(TextArray)
+#            values=[]
+#            for text in TextArray:
+#                if type(text)==dict:
+#                    text= list(NestedDictValues(text))
+#                    values.append(text)
+#                elif type(text)==list:
+#                    values=values+text
+#                else:
+#                    values.append(text)
+#            if type (values) == list and len(values):
+#                TextArray=flatten_list(values)
+#        if type(TextArray)==type(None):
+#            TextArray=["\""+str(TextArray)+"\""]
+
+#        for text in TextArray:
+            #..................................................................................
+#            if proprtyName.lower() not in str(text).lower() and ("text" in datatype or "definedterm" in datatype):
+#                refinedResults.append(text) if text not in refinedResults else refinedResults
+            #..................................................................................
+#    return refinedResults
+#########################################
+def refineResults_(TextArray,datatype,proprtyName):
     datatype=datatype.lower()
     refinedResults=[]
     if len(TextArray):
@@ -345,6 +389,7 @@ def refineResults(TextArray,datatype,proprtyName):
                 TextArray=flatten_list(values)
         if type(TextArray)==type(None):
             TextArray=["\""+str(TextArray)+"\""]
+
         for text in TextArray:
             doc = spacy_nlp(str(text).strip())
             #..................................................................................
@@ -410,9 +455,6 @@ def refineResults(TextArray,datatype,proprtyName):
             if proprtyName.lower() not in str(text).lower() and ("text" in datatype or "definedterm" in datatype):
                 refinedResults.append(text) if text not in refinedResults else refinedResults
             #..................................................................................
-
-
-
     return refinedResults
 #----------------------------------------------------------------------------------------
 foundResults=[]
@@ -532,7 +574,7 @@ def datasetProcessing_ICOS(datasetURL):
                     result=getSimilarEssentialVariables(essentialVariables,topics)
                     result= pruneExtractedContextualInformation(result, originalValues)
                 elif metadata_property=="url":
-                    result=datasetURL
+                    result=datasetURL#[str(datasetURL)]
                 else:
                     result=deep_search([metadata_property],JSON)
                     if not len(result):
@@ -542,6 +584,7 @@ def datasetProcessing_ICOS(datasetURL):
                             if len(result): searchFields.append(result)
                         result=searchFields
                 propertyDatatype=metadataStar_object[metadata_property][0]
+                #if metadata_property!="url":
                 result=refineResults(result,propertyDatatype,metadata_property)
 
                 #if metadata_property=="language" and (result=="" or result==[]):
@@ -856,7 +899,7 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
             result=getSimilarEssentialVariables(essentialVariables,topics)
             result= pruneExtractedContextualInformation(result, originalValues)
         elif metadata_property=="url":
-            result=datasetURL
+            result=datasetURL#[str(datasetURL)]
         else:
             result=deep_search([metadata_property],JSON)
             if not len(result):
@@ -866,6 +909,7 @@ def datasetProcessing_SeaDataNet_CDI(datasetURL):
                     if len(result): searchFields.append(result)
                 result=searchFields
         propertyDatatype=metadataStar_object[metadata_property][0]
+        #if metadata_property!="url":
         result=refineResults(result,propertyDatatype,metadata_property)
 
         #if metadata_property=="language" and (result=="" or result==[]):
@@ -969,7 +1013,12 @@ def invertedIndexing(datasetTitle):
         lstKeywords.append(indexFile_object["keywords"])
         lstEssentialVariables.append(indexFile_object["EssentialVariables"])
         lstPotentialTopics.append(indexFile_object["potentialTopics"])
-        url=indexFile_object["url"][0]
+        if indexFile_object["url"]!=[]:
+            url=indexFile_object["url"][0]
+#        elif indexFile_object["otherLocale"]!=[]:
+#            url=indexFile_object["otherLocale"][0]
+        else:
+            url=[]
 
         lstKeywords=MergeList(lstKeywords)
         lstEssentialVariables=MergeList(lstEssentialVariables)
@@ -1092,7 +1141,7 @@ def datasetProcessing_LifeWatch(datasetURL):
             result=getSimilarEssentialVariables(essentialVariables,topics)
             result= pruneExtractedContextualInformation(result, originalValues)
         elif metadata_property=="url":
-            result=datasetURL
+            result=datasetURL#[str(datasetURL)]
         else:
             result=deep_search([metadata_property],JSON)
             if not len(result):
@@ -1102,6 +1151,7 @@ def datasetProcessing_LifeWatch(datasetURL):
                     if len(result): searchFields.append(result)
                 result=searchFields
         propertyDatatype=metadataStar_object[metadata_property][0]
+        #if metadata_property!="url":
         result=refineResults(result,propertyDatatype,metadata_property)
         #if metadata_property=="language" and (result=="" or result==[]):
         #   result= LangaugePrediction(extractTextualContent(JSON))
@@ -1161,8 +1211,8 @@ def getFalseNegative(drivedFields, originalFields, SetOfValues):
 #----------------------------------------------------------------------------------------
 def pruneExtractedContextualInformation(drivedValues, originalValues):
     #########################################
-    #Turn it off:
-    return drivedValues
+    # Turn it off:
+    #return drivedValues
     ########################################
     lstAcceptedValues=[]
     if len(drivedValues) and len(originalValues):
@@ -1286,8 +1336,9 @@ for datasetURL in lstDataset:
 #datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/7c3iQ3A8SAeupVvMi8wFPWEN")
 #datasetProcessing_SeaDataNet_EDMED("https://edmed.seadatanet.org/report/249/")
 #datasetProcessing_LifeWatch("https://metadatacatalogue.lifewatch.eu/srv/api/records/oai:marineinfo.org:id:dataset:4040/formatters/xml?approved=true")
-
 #--------------------
-#invertedIndexing("SeaDataNet_CDI")
+#invertedIndexing("SeaDataNet_CDI_")
 #invertedIndexing("LifeWatch_")
+#invertedIndexing("SeaDataNet_EDMED_")
+#invertedIndexing("ICOS_")
 #--------------------

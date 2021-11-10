@@ -10,6 +10,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="/index files/Hashtable_ICOS_.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="/index files/SeaDataNet_CDI.csv">
           <value>
             <Attribute>
