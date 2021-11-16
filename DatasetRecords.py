@@ -45,7 +45,7 @@ lemma = WordNetLemmatizer()
 Lda = gensim.models.ldamodel.LdaModel
 spacy_nlp  = spacy.load('en_core_web_md')
 #----------------------------------------------------------------------------------------
-currentRun="Run 15/"
+currentRun="Run 12/"
 MetaDataRecordPath="./Metadata records/"
 ICOS__MetadataRecordsFileName="ICOS-metadata-records.json"
 SeaDataNet_CDI__MetadataRecordsFileName= "SeaDataNet-CDI-metadata-records.xml"
@@ -974,7 +974,7 @@ def invertedIndexing(datasetTitle):
     lstKeywords=[]
     lstEssentialVariables=[]
     lstPotentialTopics=[]
-
+    cntCategory={}
     hashtable={}
     for indexFile in lstIndexFileNames:
         indexFile_content = open(indexFile,"r")
@@ -988,17 +988,17 @@ def invertedIndexing(datasetTitle):
     lstPotentialTopics=MergeList(lstPotentialTopics)
 
     for keyword in lstKeywords:
-        if len(keyword)<200:
+        if len(keyword)<200 and len(keyword)>1:
             if keyword.lower() not in hashtable.keys():
                 hashtable[keyword.lower()]=[]
 
     for keyword in lstEssentialVariables:
-        if len(keyword)<200:
+        if len(keyword)<200 and len(keyword)>1:
             if keyword.lower() not in hashtable.keys():
                 hashtable[keyword.lower()]=[]
 
     for keyword in lstPotentialTopics:
-        if len(keyword)<200:
+        if len(keyword)<200 and len(keyword)>1:
             if keyword.lower() not in hashtable.keys():
                 hashtable[keyword.lower()]=[]
 
@@ -1015,10 +1015,13 @@ def invertedIndexing(datasetTitle):
         lstPotentialTopics.append(indexFile_object["potentialTopics"])
         if indexFile_object["url"]!=[]:
             url=indexFile_object["url"][0]
+            url = re.findall("(?P<url>https?://[^\s]+)", url)
+            if not len(url):
+                continue
 #        elif indexFile_object["otherLocale"]!=[]:
 #            url=indexFile_object["otherLocale"][0]
         else:
-            url=[]
+            continue
 
         lstKeywords=MergeList(lstKeywords)
         lstEssentialVariables=MergeList(lstEssentialVariables)
@@ -1039,11 +1042,16 @@ def invertedIndexing(datasetTitle):
                 if url not in hashtable[keyword.lower()]:
                     hashtable[keyword.lower()].append(url)
 
-
     with open(Hashtablefnames, 'w') as f:
         for key in hashtable.keys():
+            if str(len(hashtable[key])) not in cntCategory.keys():
+                cntCategory[str(len(hashtable[key]))]=1
+            else:
+                cntCategory[str(len(hashtable[key]))]=cntCategory[str(len(hashtable[key]))]+1
+        f.write("%s, %s, %s\n" % (currentRun, str(len(hashtable.keys())) , str(cntCategory)))
+        for key in hashtable.keys():
             value= str(hashtable[key]).replace("'","").replace("[","").replace("]","")
-            f.write("%s, %s\n" % (key, value))
+            f.write("%s, %s, %s\n" % (str(len(hashtable[key])) , key, value))
     print("Inverted indexing is done!")
     f.close()
 
@@ -1314,21 +1322,21 @@ def saveSelectedURLs(lstDataset, datasetTitle):
 #lstDataset= getOnlineDatasetRecords__ICOS(True,100,1)
 #lstDataset= getOnlineDatasetRecords__LifeWatch(True,100,1)
 #--------------------
-lstDataset= getCurrentListOfDatasetRecords("SeaDataNet_CDI")
-for datasetURL in lstDataset:
-    datasetProcessing_SeaDataNet_CDI(datasetURL)
+#lstDataset= getCurrentListOfDatasetRecords("SeaDataNet_CDI")
+#for datasetURL in lstDataset:
+#    datasetProcessing_SeaDataNet_CDI(datasetURL)
 #--------------------
-lstDataset= getCurrentListOfDatasetRecords("ICOS")
-for datasetURL in lstDataset:
-    datasetProcessing_ICOS(datasetURL)
+#lstDataset= getCurrentListOfDatasetRecords("ICOS")
+#for datasetURL in lstDataset:
+#    datasetProcessing_ICOS(datasetURL)
 #--------------------
-lstDataset= getCurrentListOfDatasetRecords("LifeWatch")
-for datasetURL in lstDataset:
-   datasetProcessing_LifeWatch(datasetURL)
+#lstDataset= getCurrentListOfDatasetRecords("LifeWatch")
+#for datasetURL in lstDataset:
+#   datasetProcessing_LifeWatch(datasetURL)
 #--------------------
-lstDataset= getCurrentListOfDatasetRecords("SeaDataNet_EDMED")
-for datasetURL in lstDataset:
-   datasetProcessing_SeaDataNet_EDMED(datasetURL)
+#lstDataset= getCurrentListOfDatasetRecords("SeaDataNet_EDMED")
+#for datasetURL in lstDataset:
+#   datasetProcessing_SeaDataNet_EDMED(datasetURL)
 #--------------------
 #datasetProcessing_SeaDataNet_CDI("https://cdi.seadatanet.org/report/aggregation/120/2688/120/4/ds12/json")
 #datasetProcessing_ICOS("https://meta.icos-cp.eu/objects/mpjm3qpCpK1EzMPIR9nDE5BO")
@@ -1337,8 +1345,8 @@ for datasetURL in lstDataset:
 #datasetProcessing_SeaDataNet_EDMED("https://edmed.seadatanet.org/report/249/")
 #datasetProcessing_LifeWatch("https://metadatacatalogue.lifewatch.eu/srv/api/records/oai:marineinfo.org:id:dataset:4040/formatters/xml?approved=true")
 #--------------------
-#invertedIndexing("SeaDataNet_CDI_")
-#invertedIndexing("LifeWatch_")
-#invertedIndexing("SeaDataNet_EDMED_")
-#invertedIndexing("ICOS_")
+invertedIndexing("SeaDataNet_CDI_")
+invertedIndexing("LifeWatch_")
+invertedIndexing("SeaDataNet_EDMED_")
+invertedIndexing("ICOS_")
 #--------------------

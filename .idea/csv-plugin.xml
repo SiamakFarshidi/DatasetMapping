@@ -10,7 +10,35 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="/index files/Hashtable_ICOS_.csv">
+        <entry key="/index files/Run 12/Hashtable_ICOS_.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/index files/Run 15/Hashtable_ICOS_.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/index files/Run 15/Hashtable_LifeWatch_.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value=":" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/index files/Run 15/Hashtable_SeaDataNet_CDI_.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/index files/Run 15/Hashtable_SeaDataNet_EDMED_.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -21,13 +49,6 @@
           <value>
             <Attribute>
               <option name="separator" value=":" />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="/index files/logfile.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
